@@ -21,11 +21,11 @@ The panel configuration is stored in `model.meta.embed`.
 ```html
 <script src="https://YOUR_OPEN_WEBUI/static/embed/open-webui-chatbot.js"></script>
 <script>
-  OpenWebUIChatbot.init({
-    panelId: "panel-support",
-    apiBaseUrl: "https://YOUR_OPEN_WEBUI",
-    externalToken: "JWT_FROM_HOST_APP"
-  });
+	OpenWebUIChatbot.init({
+		panelId: 'panel-support',
+		apiBaseUrl: 'https://YOUR_OPEN_WEBUI',
+		externalToken: 'JWT_FROM_HOST_APP'
+	});
 </script>
 ```
 
