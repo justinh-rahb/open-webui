@@ -318,6 +318,7 @@ async def get_current_user(
             )
 
         if data is not None and "id" in data:
+            request.state.token_data = data
             if data.get("jti") and not await is_valid_token(request, data):
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,

@@ -113,6 +113,38 @@
 	let actionIds = [];
 	let accessGrants = [];
 	let tts = { voice: '' };
+	let embedEnabled = false;
+	let embedPanelId = '';
+	let embedTitle = '';
+	let embedWelcomeMessage = '';
+	let embedAuthMode = 'external_jwt';
+	let embedAllowAnonymous = false;
+	let embedAllowedOrigins = '';
+
+	const slugify = (value: string) => value.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
+
+	const getEmbedPanelId = () => {
+		if (embedPanelId.trim()) {
+			return embedPanelId.trim();
+		}
+		return `panel-${slugify(id || name || info?.id || '')}`;
+	};
+
+	const getEmbedSnippet = () => {
+		const panelId = getEmbedPanelId();
+		if (!panelId) {
+			return '';
+		}
+		const origin = typeof window === 'undefined' ? '' : window.location.origin;
+
+		return `<script src="${origin}/static/embed/open-webui-chatbot.js"><\/script>
+<script>
+  OpenWebUIChatbot.init({
+    panelId: "${panelId}",
+    apiBaseUrl: "${origin}"
+  });
+<\/script>`;
+	};
 
 	const submitHandler = async () => {
 		loading = true;
@@ -228,6 +260,23 @@
 			}
 		}
 
+		if (embedEnabled) {
+			info.meta.embed = {
+				enabled: true,
+				panel_id: getEmbedPanelId(),
+				title: embedTitle.trim() || name,
+				welcome_message: embedWelcomeMessage.trim() || null,
+				auth_mode: embedAuthMode,
+				allow_anonymous: embedAllowAnonymous,
+				allowed_origins: embedAllowedOrigins
+					.split(',')
+					.map((origin) => origin.trim())
+					.filter(Boolean)
+			};
+		} else if (info?.meta?.embed) {
+			delete info.meta.embed;
+		}
+
 		info.params.system = system.trim() === '' ? null : system;
 		info.params.stop = params.stop ? params.stop.split(',').filter((s) => s.trim()) : null;
 		Object.keys(info.params).forEach((key) => {
@@ -312,6 +361,13 @@
 			defaultFeatureIds = model?.meta?.defaultFeatureIds ?? [];
 			builtinTools = model?.meta?.builtinTools ?? {};
 			tts = { voice: model?.meta?.tts?.voice ?? '' };
+			embedEnabled = model?.meta?.embed?.enabled ?? false;
+			embedPanelId = model?.meta?.embed?.panel_id ?? '';
+			embedTitle = model?.meta?.embed?.title ?? '';
+			embedWelcomeMessage = model?.meta?.embed?.welcome_message ?? '';
+			embedAuthMode = model?.meta?.embed?.auth_mode ?? 'external_jwt';
+			embedAllowAnonymous = model?.meta?.embed?.allow_anonymous ?? false;
+			embedAllowedOrigins = (model?.meta?.embed?.allowed_origins ?? []).join(', ');
 
 			accessGrants = model?.access_grants ?? [];
 
@@ -828,6 +884,93 @@
 							bind:value={tts.voice}
 							placeholder={$i18n.t('e.g. alloy, echo, shimmer')}
 						/>
+					</div>
+
+					<div class="my-4">
+						<div class="flex w-full justify-between mb-1">
+							<div class="self-center text-xs font-medium text-gray-500">
+								{$i18n.t('Embeddable Panel')}
+							</div>
+							<label class="text-xs flex items-center gap-2">
+								<input type="checkbox" bind:checked={embedEnabled} />
+								<span>{$i18n.t('Enabled')}</span>
+							</label>
+						</div>
+
+						{#if embedEnabled}
+							<div class="space-y-2">
+								<input
+									class="w-full text-sm bg-transparent outline-hidden"
+									type="text"
+									bind:value={embedPanelId}
+									placeholder={$i18n.t('Panel ID (optional, auto-generated if empty)')}
+								/>
+
+								<input
+									class="w-full text-sm bg-transparent outline-hidden"
+									type="text"
+									bind:value={embedTitle}
+									placeholder={$i18n.t('Panel Title')}
+								/>
+
+								<Textarea
+									className="text-sm w-full bg-transparent outline-hidden resize-none overflow-y-hidden"
+									placeholder={$i18n.t('Welcome message for embedded chat')}
+									bind:value={embedWelcomeMessage}
+								/>
+
+								<select
+									class="w-full text-sm bg-transparent outline-hidden"
+									bind:value={embedAuthMode}
+								>
+									<option value="external_jwt">external_jwt</option>
+									<option value="openwebui_session">openwebui_session</option>
+								</select>
+
+								<label class="text-xs flex items-center gap-2">
+									<input type="checkbox" bind:checked={embedAllowAnonymous} />
+									<span>{$i18n.t('Allow Anonymous')}</span>
+								</label>
+
+								<input
+									class="w-full text-sm bg-transparent outline-hidden"
+									type="text"
+									bind:value={embedAllowedOrigins}
+									placeholder={$i18n.t(
+										'Allowed Origins (comma-separated, leave blank to allow all)'
+									)}
+								/>
+
+								<div class="mt-2">
+									<div class="text-xs font-medium mb-1 text-gray-500">
+										{$i18n.t('Embed Snippet')}
+									</div>
+									<textarea
+										class="text-xs w-full bg-transparent outline-hidden resize-none"
+										rows="6"
+										readonly
+										value={getEmbedSnippet()}
+									/>
+									<div class="flex justify-end mt-2">
+										<button
+											type="button"
+											class="text-xs px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800"
+											on:click={async () => {
+												const snippet = getEmbedSnippet();
+												if (!snippet) {
+													toast.error($i18n.t('Set a model name or panel id first.'));
+													return;
+												}
+												await navigator.clipboard.writeText(snippet);
+												toast.success($i18n.t('Embed snippet copied.'));
+											}}
+										>
+											{$i18n.t('Copy')}
+										</button>
+									</div>
+								</div>
+							</div>
+						{/if}
 					</div>
 
 					<hr class=" border-gray-100/30 dark:border-gray-850/30 my-4" />

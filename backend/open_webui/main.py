@@ -96,6 +96,7 @@ from open_webui.routers import (
     users,
     utils,
     scim,
+    embed,
 )
 
 from open_webui.routers.retrieval import (
@@ -372,6 +373,9 @@ from open_webui.config import (
     ENABLE_API_KEYS,
     ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
     API_KEYS_ALLOWED_ENDPOINTS,
+    ENABLE_EMBED,
+    ENABLE_EMBED_TOKEN_EXCHANGE,
+    EMBED_TOKEN_EXPIRES_IN,
     ENABLE_FOLDERS,
     FOLDER_MAX_FILE_COUNT,
     ENABLE_CHANNELS,
@@ -512,6 +516,7 @@ from open_webui.utils.chat import (
     chat_completed as chat_completed_handler,
 )
 from open_webui.utils.actions import chat_action as chat_action_handler
+from open_webui.utils.embed import get_embed_panel_by_id, is_origin_allowed
 from open_webui.utils.embeddings import generate_embeddings
 from open_webui.utils.middleware import (
     build_chat_response_context,
@@ -811,6 +816,9 @@ app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = (
 app.state.config.API_KEYS_ALLOWED_ENDPOINTS = API_KEYS_ALLOWED_ENDPOINTS
 
 app.state.config.JWT_EXPIRES_IN = JWT_EXPIRES_IN
+app.state.config.ENABLE_EMBED = ENABLE_EMBED
+app.state.config.ENABLE_EMBED_TOKEN_EXCHANGE = ENABLE_EMBED_TOKEN_EXCHANGE
+app.state.config.EMBED_TOKEN_EXPIRES_IN = EMBED_TOKEN_EXPIRES_IN
 
 app.state.config.SHOW_ADMIN_DETAILS = SHOW_ADMIN_DETAILS
 app.state.config.ADMIN_EMAIL = ADMIN_EMAIL
@@ -1494,6 +1502,7 @@ app.include_router(configs.router, prefix="/api/v1/configs", tags=["configs"])
 
 app.include_router(auths.router, prefix="/api/v1/auths", tags=["auths"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["users"])
+app.include_router(embed.router, prefix="/api/v1/embed", tags=["embed"])
 
 
 app.include_router(channels.router, prefix="/api/v1/channels", tags=["channels"])
@@ -1647,6 +1656,61 @@ async def chat_completion(
     model_item = form_data.pop("model_item", {})
     tasks = form_data.pop("background_tasks", None)
 
+    token_data = getattr(request.state, "token_data", {}) or {}
+    embed_scope = (
+        token_data.get("embed_scope") if isinstance(token_data, dict) else None
+    )
+    if embed_scope:
+        if not request.app.state.config.ENABLE_EMBED:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+
+        if not isinstance(embed_scope, dict):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=ERROR_MESSAGES.INVALID_TOKEN,
+            )
+
+        scoped_panel_id = embed_scope.get("panel_id")
+        scoped_model_id = embed_scope.get("model_id")
+        if not scoped_panel_id or not scoped_model_id:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=ERROR_MESSAGES.INVALID_TOKEN,
+            )
+
+        panel = get_embed_panel_by_id(scoped_panel_id)
+        if not panel or panel["model_id"] != scoped_model_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+
+        origin = request.headers.get("origin")
+        if not is_origin_allowed(panel["allowed_origins"], origin):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+
+        if model_item.get("direct", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Direct model usage is not allowed for embed sessions.",
+            )
+
+        if model_id and model_id != scoped_model_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Model override is not allowed for embed sessions.",
+            )
+
+        model_id = scoped_model_id
+        form_data["model"] = scoped_model_id
+        form_data.pop("tool_servers", None)
+
     metadata = {}
     try:
         model_info = None
@@ -1744,7 +1808,6 @@ async def chat_completion(
             if not metadata["chat_id"].startswith(
                 "local:"
             ):  # temporary chats are not stored
-
                 # Verify chat ownership
                 chat = Chats.get_chat_by_id_and_user_id(metadata["chat_id"], user.id)
                 if chat is None and user.role != "admin":  # admins can access any chat
@@ -2018,6 +2081,8 @@ async def get_app_config(request: Request):
             "enable_signup_password_confirmation": ENABLE_SIGNUP_PASSWORD_CONFIRMATION,
             "enable_ldap": app.state.config.ENABLE_LDAP,
             "enable_api_keys": app.state.config.ENABLE_API_KEYS,
+            "enable_embed": app.state.config.ENABLE_EMBED,
+            "enable_embed_token_exchange": app.state.config.ENABLE_EMBED_TOKEN_EXCHANGE,
             "enable_signup": app.state.config.ENABLE_SIGNUP,
             "enable_login_form": app.state.config.ENABLE_LOGIN_FORM,
             "enable_websocket": ENABLE_WEBSOCKET_SUPPORT,

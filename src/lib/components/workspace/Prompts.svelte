@@ -491,7 +491,9 @@
 								</PromptMenu>
 
 								<button on:click|stopPropagation|preventDefault>
-									<Tooltip content={prompt.is_active !== false ? $i18n.t('Enabled') : $i18n.t('Disabled')}>
+									<Tooltip
+										content={prompt.is_active !== false ? $i18n.t('Enabled') : $i18n.t('Disabled')}
+									>
 										<Switch
 											bind:state={prompt.is_active}
 											on:change={async () => {
