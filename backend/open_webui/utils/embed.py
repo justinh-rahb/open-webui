@@ -37,7 +37,9 @@ def get_embed_config(model: Any) -> Optional[dict]:
     if not embed.get("enabled", False):
         return None
 
-    panel_id = str(embed.get("panel_id") or f"panel-{_to_slug(getattr(model, 'id', ''))}")
+    panel_id = str(
+        embed.get("panel_id") or f"panel-{_to_slug(getattr(model, 'id', ''))}"
+    )
     auth_mode = str(embed.get("auth_mode") or "external_jwt")
 
     return {
@@ -53,7 +55,9 @@ def get_embed_config(model: Any) -> Optional[dict]:
     }
 
 
-def get_embed_panel_by_id(panel_id: str, db: Optional[Session] = None) -> Optional[dict]:
+def get_embed_panel_by_id(
+    panel_id: str, db: Optional[Session] = None
+) -> Optional[dict]:
     for model in Models.get_models(db=db):
         config = get_embed_config(model)
         if config and config["panel_id"] == panel_id:

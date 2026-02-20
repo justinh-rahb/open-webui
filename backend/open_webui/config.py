@@ -320,7 +320,9 @@ JWT_EXPIRES_IN = PersistentConfig(
 )
 
 ENABLE_EMBED = PersistentConfig(
-    "ENABLE_EMBED", "embed.enable", os.environ.get("ENABLE_EMBED", "False").lower() == "true"
+    "ENABLE_EMBED",
+    "embed.enable",
+    os.environ.get("ENABLE_EMBED", "False").lower() == "true",
 )
 
 ENABLE_EMBED_TOKEN_EXCHANGE = PersistentConfig(

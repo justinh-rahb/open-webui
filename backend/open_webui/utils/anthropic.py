@@ -61,13 +61,15 @@ async def get_anthropic_models(url: str, key: str, user: UserModel = None) -> di
                     data = await response.json()
 
                     for model in data.get("data", []):
-                        all_models.append({
-                            "id": model.get("id"),
-                            "object": "model",
-                            "created": 0,
-                            "owned_by": "anthropic",
-                            "name": model.get("display_name", model.get("id")),
-                        })
+                        all_models.append(
+                            {
+                                "id": model.get("id"),
+                                "object": "model",
+                                "created": 0,
+                                "owned_by": "anthropic",
+                                "name": model.get("display_name", model.get("id")),
+                            }
+                        )
 
                     if not data.get("has_more", False):
                         break
