@@ -137,13 +137,13 @@
 		}
 		const origin = typeof window === 'undefined' ? '' : window.location.origin;
 
-		return `<script src="${origin}/static/embed/open-webui-chatbot.js"></script>
+		return `<script src="${origin}/static/embed/open-webui-chatbot.js"><\/script>
 <script>
   OpenWebUIChatbot.init({
     panelId: "${panelId}",
     apiBaseUrl: "${origin}"
   });
-</script>`;
+<\/script>`;
 	};
 
 	const submitHandler = async () => {
