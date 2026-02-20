@@ -563,6 +563,17 @@ ENABLE_OAUTH_TOKEN_EXCHANGE = (
     os.environ.get("ENABLE_OAUTH_TOKEN_EXCHANGE", "False").lower() == "true"
 )
 
+# Embed Configuration
+ENABLE_EMBED = os.environ.get("ENABLE_EMBED", "False").lower() == "true"
+ENABLE_EMBED_TOKEN_EXCHANGE = (
+    os.environ.get("ENABLE_EMBED_TOKEN_EXCHANGE", "False").lower() == "true"
+)
+EMBED_JWT_SECRET = os.environ.get("EMBED_JWT_SECRET", "")
+EMBED_JWT_ISSUER = os.environ.get("EMBED_JWT_ISSUER", "")
+EMBED_JWT_AUDIENCE = os.environ.get("EMBED_JWT_AUDIENCE", "")
+EMBED_JWT_EMAIL_CLAIM = os.environ.get("EMBED_JWT_EMAIL_CLAIM", "email")
+EMBED_TOKEN_EXPIRES_IN = os.environ.get("EMBED_TOKEN_EXPIRES_IN", "1h")
+
 ####################################
 # SCIM Configuration
 ####################################
