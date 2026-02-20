@@ -581,7 +581,8 @@ class SPAStaticFiles(StaticFiles):
                 raise ex
 
 
-print(rf"""
+print(
+    rf"""
  ██████╗ ██████╗ ███████╗███╗   ██╗    ██╗    ██╗███████╗██████╗ ██╗   ██╗██╗
 ██╔═══██╗██╔══██╗██╔════╝████╗  ██║    ██║    ██║██╔════╝██╔══██╗██║   ██║██║
 ██║   ██║██████╔╝█████╗  ██╔██╗ ██║    ██║ █╗ ██║█████╗  ██████╔╝██║   ██║██║
@@ -593,7 +594,8 @@ print(rf"""
 v{VERSION} - building the best AI user interface.
 {f"Commit: {WEBUI_BUILD_HASH}" if WEBUI_BUILD_HASH != "dev-build" else ""}
 https://github.com/open-webui/open-webui
-""")
+"""
+)
 
 
 @asynccontextmanager
@@ -1657,7 +1659,9 @@ async def chat_completion(
     tasks = form_data.pop("background_tasks", None)
 
     token_data = getattr(request.state, "token_data", {}) or {}
-    embed_scope = token_data.get("embed_scope") if isinstance(token_data, dict) else None
+    embed_scope = (
+        token_data.get("embed_scope") if isinstance(token_data, dict) else None
+    )
     if embed_scope:
         if not request.app.state.config.ENABLE_EMBED:
             raise HTTPException(
@@ -1806,7 +1810,6 @@ async def chat_completion(
             if not metadata["chat_id"].startswith(
                 "local:"
             ):  # temporary chats are not stored
-
                 # Verify chat ownership
                 chat = Chats.get_chat_by_id_and_user_id(metadata["chat_id"], user.id)
                 if chat is None and user.role != "admin":  # admins can access any chat
