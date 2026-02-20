@@ -4,6 +4,7 @@ import uuid
 import time
 import datetime
 import logging
+import jwt
 from aiohttp import ClientSession
 import urllib
 
@@ -40,6 +41,10 @@ from open_webui.env import (
     WEBUI_AUTH_SIGNOUT_REDIRECT_URL,
     ENABLE_INITIAL_ADMIN_SIGNUP,
     ENABLE_OAUTH_TOKEN_EXCHANGE,
+    EMBED_JWT_SECRET,
+    EMBED_JWT_ISSUER,
+    EMBED_JWT_AUDIENCE,
+    EMBED_JWT_EMAIL_CLAIM,
     AIOHTTP_CLIENT_SESSION_SSL,
 )
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -73,6 +78,7 @@ from sqlalchemy.orm import Session
 from open_webui.utils.webhook import post_webhook
 from open_webui.utils.access_control import get_permissions, has_permission
 from open_webui.utils.groups import apply_default_group_assignment
+from open_webui.utils.embed import get_embed_panel_by_id, is_origin_allowed
 
 from open_webui.utils.redis import get_redis_client
 from open_webui.utils.rate_limit import RateLimiter
@@ -95,7 +101,13 @@ signin_rate_limiter = RateLimiter(
 
 
 def create_session_response(
-    request: Request, user, db, response: Response = None, set_cookie: bool = False
+    request: Request,
+    user,
+    db,
+    response: Response = None,
+    set_cookie: bool = False,
+    token_claims: Optional[dict] = None,
+    expires_in: Optional[str] = None,
 ) -> dict:
     """
     Create JWT token and build session response for a user.
@@ -108,13 +120,13 @@ def create_session_response(
         response: FastAPI response object (required if set_cookie is True)
         set_cookie: Whether to set the auth cookie on the response
     """
-    expires_delta = parse_duration(request.app.state.config.JWT_EXPIRES_IN)
+    expires_delta = parse_duration(expires_in or request.app.state.config.JWT_EXPIRES_IN)
     expires_at = None
     if expires_delta:
         expires_at = int(time.time()) + int(expires_delta.total_seconds())
 
     token = create_token(
-        data={"id": user.id},
+        data={"id": user.id, **(token_claims or {})},
         expires_delta=expires_delta,
     )
 
@@ -1268,7 +1280,142 @@ async def get_api_key(
 ############################
 
 
-class TokenExchangeForm(BaseModel):
+class EmbedTokenExchangeForm(BaseModel):
+    panel_id: str
+    token: str
+
+
+class EmbedTokenForm(BaseModel):
+    panel_id: str
+
+
+@router.post("/embed/token", response_model=SessionUserResponse)
+async def create_embed_token(
+    request: Request,
+    form_data: EmbedTokenForm,
+    user=Depends(get_verified_user),
+    db: Session = Depends(get_session),
+):
+    if not request.app.state.config.ENABLE_EMBED:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Embed is disabled",
+        )
+
+    panel = get_embed_panel_by_id(form_data.panel_id, db=db)
+    if not panel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ERROR_MESSAGES.NOT_FOUND,
+        )
+
+    origin = request.headers.get("origin")
+    if not is_origin_allowed(panel["allowed_origins"], origin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+
+    return create_session_response(
+        request,
+        user,
+        db,
+        token_claims={
+            "embed_scope": {
+                "panel_id": panel["panel_id"],
+                "model_id": panel["model_id"],
+            }
+        },
+        expires_in=request.app.state.config.EMBED_TOKEN_EXPIRES_IN,
+    )
+
+
+@router.post("/embed/token/exchange", response_model=SessionUserResponse)
+async def embed_token_exchange(
+    request: Request,
+    response: Response,
+    form_data: EmbedTokenExchangeForm,
+    db: Session = Depends(get_session),
+):
+    """
+    Exchange an external JWT for a scoped OpenWebUI JWT used by embed widgets.
+    This endpoint is disabled by default. Set ENABLE_EMBED_TOKEN_EXCHANGE=True.
+    """
+    if (
+        not request.app.state.config.ENABLE_EMBED
+        or not request.app.state.config.ENABLE_EMBED_TOKEN_EXCHANGE
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Embed token exchange is disabled",
+        )
+
+    if not EMBED_JWT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="EMBED_JWT_SECRET is not configured",
+        )
+
+    panel = get_embed_panel_by_id(form_data.panel_id, db=db)
+    if not panel:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ERROR_MESSAGES.NOT_FOUND,
+        )
+
+    origin = request.headers.get("origin")
+    if not is_origin_allowed(panel["allowed_origins"], origin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+
+    decode_kwargs = {
+        "key": EMBED_JWT_SECRET,
+        "algorithms": ["HS256"],
+    }
+    if EMBED_JWT_ISSUER:
+        decode_kwargs["issuer"] = EMBED_JWT_ISSUER
+    if EMBED_JWT_AUDIENCE:
+        decode_kwargs["audience"] = EMBED_JWT_AUDIENCE
+
+    try:
+        claims = jwt.decode(form_data.token, **decode_kwargs)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid embed token",
+        )
+
+    email = (claims.get(EMBED_JWT_EMAIL_CLAIM) or "").lower()
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Token missing required '{EMBED_JWT_EMAIL_CLAIM}' claim",
+        )
+
+    user = Users.get_user_by_email(email, db=db)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User not found. Please sign in via the web interface first.",
+        )
+
+    return create_session_response(
+        request,
+        user,
+        db,
+        token_claims={
+            "embed_scope": {
+                "panel_id": panel["panel_id"],
+                "model_id": panel["model_id"],
+            }
+        },
+        expires_in=request.app.state.config.EMBED_TOKEN_EXPIRES_IN,
+    )
+
+
+class OAuthTokenExchangeForm(BaseModel):
     token: str  # OAuth access token from external provider
 
 
@@ -1277,7 +1424,7 @@ async def token_exchange(
     request: Request,
     response: Response,
     provider: str,
-    form_data: TokenExchangeForm,
+    form_data: OAuthTokenExchangeForm,
     db: Session = Depends(get_session),
 ):
     """

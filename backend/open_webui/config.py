@@ -319,6 +319,22 @@ JWT_EXPIRES_IN = PersistentConfig(
     "JWT_EXPIRES_IN", "auth.jwt_expiry", os.environ.get("JWT_EXPIRES_IN", "4w")
 )
 
+ENABLE_EMBED = PersistentConfig(
+    "ENABLE_EMBED", "embed.enable", os.environ.get("ENABLE_EMBED", "False").lower() == "true"
+)
+
+ENABLE_EMBED_TOKEN_EXCHANGE = PersistentConfig(
+    "ENABLE_EMBED_TOKEN_EXCHANGE",
+    "embed.token_exchange.enable",
+    os.environ.get("ENABLE_EMBED_TOKEN_EXCHANGE", "False").lower() == "true",
+)
+
+EMBED_TOKEN_EXPIRES_IN = PersistentConfig(
+    "EMBED_TOKEN_EXPIRES_IN",
+    "embed.token_exchange.expires_in",
+    os.environ.get("EMBED_TOKEN_EXPIRES_IN", "1h"),
+)
+
 if JWT_EXPIRES_IN.value == "-1":
     log.warning(
         "⚠️  SECURITY WARNING: JWT_EXPIRES_IN is set to '-1'\n"
