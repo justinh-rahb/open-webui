@@ -120,7 +120,9 @@ def create_session_response(
         response: FastAPI response object (required if set_cookie is True)
         set_cookie: Whether to set the auth cookie on the response
     """
-    expires_delta = parse_duration(expires_in or request.app.state.config.JWT_EXPIRES_IN)
+    expires_delta = parse_duration(
+        expires_in or request.app.state.config.JWT_EXPIRES_IN
+    )
     expires_at = None
     if expires_delta:
         expires_at = int(time.time()) + int(expires_delta.total_seconds())
@@ -185,7 +187,6 @@ async def get_session_user(
     user=Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-
     auth_header = request.headers.get("Authorization")
     auth_token = get_http_authorization_cred(auth_header)
     token = auth_token.credentials
@@ -810,7 +811,6 @@ async def signup(
 async def signout(
     request: Request, response: Response, db: Session = Depends(get_session)
 ):
-
     # get auth token from headers or cookies
     token = None
     auth_header = request.headers.get("Authorization")
