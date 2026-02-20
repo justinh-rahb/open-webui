@@ -10,6 +10,18 @@ def _to_slug(value: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]", "-", value).strip("-").lower()
 
 
+def _as_dict(value: Any) -> dict:
+    if isinstance(value, dict):
+        return value
+    if value is None:
+        return {}
+    model_dump = getattr(value, "model_dump", None)
+    if callable(model_dump):
+        dumped = model_dump()
+        return dumped if isinstance(dumped, dict) else {}
+    return {}
+
+
 def normalize_allowed_origins(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(origin).strip() for origin in value if str(origin).strip()]
@@ -19,11 +31,8 @@ def normalize_allowed_origins(value: Any) -> list[str]:
 
 
 def get_embed_config(model: Any) -> Optional[dict]:
-    meta = (getattr(model, "meta", None) or {}).copy()
-    embed = (meta.get("embed") or {}).copy()
-
-    if not isinstance(embed, dict):
-        return None
+    meta = _as_dict(getattr(model, "meta", None)).copy()
+    embed = _as_dict(meta.get("embed")).copy()
 
     if not embed.get("enabled", False):
         return None
