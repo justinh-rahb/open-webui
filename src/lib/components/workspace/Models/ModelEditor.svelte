@@ -919,7 +919,10 @@
 									bind:value={embedWelcomeMessage}
 								/>
 
-								<select class="w-full text-sm bg-transparent outline-hidden" bind:value={embedAuthMode}>
+								<select
+									class="w-full text-sm bg-transparent outline-hidden"
+									bind:value={embedAuthMode}
+								>
 									<option value="external_jwt">external_jwt</option>
 									<option value="openwebui_session">openwebui_session</option>
 								</select>
@@ -939,7 +942,9 @@
 								/>
 
 								<div class="mt-2">
-									<div class="text-xs font-medium mb-1 text-gray-500">{$i18n.t('Embed Snippet')}</div>
+									<div class="text-xs font-medium mb-1 text-gray-500">
+										{$i18n.t('Embed Snippet')}
+									</div>
 									<textarea
 										class="text-xs w-full bg-transparent outline-hidden resize-none"
 										rows="6"

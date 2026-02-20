@@ -145,7 +145,9 @@
 	<title>{panel?.title ?? 'Open WebUI Embed'}</title>
 </svelte:head>
 
-<div class="h-screen w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col">
+<div
+	class="h-screen w-full bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 flex flex-col"
+>
 	<div class="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
 		<div class="text-sm font-semibold">{panel?.title ?? 'Chat'}</div>
 	</div>
