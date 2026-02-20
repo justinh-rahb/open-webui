@@ -34,6 +34,24 @@ def test_get_embed_config_defaults_panel_id():
     assert config["title"] == "Support"
 
 
+def test_get_embed_config_supports_model_dump_meta():
+    class MetaModel:
+        def model_dump(self):
+            return {
+                "embed": {
+                    "enabled": True,
+                    "panel_id": "panel-embed-test",
+                    "allowed_origins": [],
+                }
+            }
+
+    model = SimpleNamespace(id="embed-test", name="Embed Test", meta=MetaModel())
+    config = get_embed_config(model)
+    assert config is not None
+    assert config["panel_id"] == "panel-embed-test"
+    assert config["model_id"] == "embed-test"
+
+
 def test_get_embed_panel_by_id(monkeypatch):
     model_a = _model("a", "A", {"enabled": True, "panel_id": "panel-a"})
     model_b = _model("b", "B", {"enabled": True, "panel_id": "panel-b"})
